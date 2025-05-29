@@ -232,7 +232,10 @@ fun HistoryItem(
                 Spacer(modifier = Modifier.height(4.dp))
                 
                 Text(
-                    text = "Chapter ${history.chapterId}",
+                    text = if (history.chapterName.isNotBlank()) 
+                             "Chapter ${history.chapterName}" 
+                           else 
+                             "Chapter ${history.chapterId}",
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.primary
                 )

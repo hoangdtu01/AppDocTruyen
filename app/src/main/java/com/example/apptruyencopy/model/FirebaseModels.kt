@@ -17,6 +17,7 @@ data class ReadingHistory(
     val historyId: String = "",
     val mangaId: String = "",
     val chapterId: String = "",
+    val chapterName: String = "",
     val title: String = "",
     val coverUrl: String = "",
     val timestamp: Timestamp = Timestamp.now()

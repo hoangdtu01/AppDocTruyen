@@ -250,12 +250,15 @@ class FirebaseRepository {
     suspend fun addComment(mangaId: String, content: String) {
         val userId = auth.currentUser?.uid ?: return
         val user = getUser(userId)
+        val email = user?.email ?: auth.currentUser?.email ?: ""
+        val userName = email.split("@").firstOrNull() ?: ""
         
         val comment = Comment(
             mangaId = mangaId,
             userId = userId,
             content = content,
-            userName = user?.name ?: "",
+//            userName = user?.name ?: "",
+            userName = userName,
             userAvatar = "" // Thêm avatar URL nếu có
         )
         

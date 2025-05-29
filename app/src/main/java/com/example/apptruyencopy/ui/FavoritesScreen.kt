@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +28,7 @@ import com.example.apptruyencopy.di.AppViewModelProvider
 import com.example.apptruyencopy.model.Manga
 import com.example.apptruyencopy.viewmodel.FavoritesViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FavoritesScreen(
     navController: NavController,
@@ -35,27 +38,84 @@ fun FavoritesScreen(
     val isLoading by viewModel.isLoading
     val isLoggedIn by viewModel.isLoggedIn
     
+    // Theo dõi tab hiện tại
+    var selectedTab by remember { mutableStateOf(0) } // Mặc định là "Yêu thích" (index 0)
+    
     LaunchedEffect(Unit) {
         viewModel.loadFavoriteMangas()
     }
     
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        // Title
-        Text(
-            text = "Truyện yêu thích",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Truyện yêu thích") }
+            )
+        },
+        bottomBar = {
+            NavigationBar {
+                // Tủ sách / Yêu thích
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.Bookmarks, contentDescription = "Yêu thích") },
+                    label = { Text("Yêu thích") },
+                    selected = selectedTab == 0,
+                    onClick = { 
+                        selectedTab = 0
+                        // Đã ở trang favorites nên không cần navigate
+                    }
+                )
+                
+                // Truyện (Home)
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.Home, contentDescription = "Truyện") },
+                    label = { Text("Truyện") },
+                    selected = selectedTab == 1,
+                    onClick = { 
+                        selectedTab = 1
+                        navController.navigate("home")
+                    }
+                )
+                
+                // Thể loại
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.Category, contentDescription = "Thể loại") },
+                    label = { Text("Thể loại") },
+                    selected = selectedTab == 2,
+                    onClick = { 
+                        selectedTab = 2
+                        navController.navigate("genres")
+                    }
+                )
+                
+                // Lịch sử đọc truyện
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.History, contentDescription = "Lịch sử") },
+                    label = { Text("Lịch sử") },
+                    selected = selectedTab == 3,
+                    onClick = { 
+                        selectedTab = 3
+                        navController.navigate("history") 
+                    }
+                )
+                
+                // Tôi (Profile)
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.Person, contentDescription = "Tôi") },
+                    label = { Text("Tôi") },
+                    selected = selectedTab == 4,
+                    onClick = { 
+                        selectedTab = 4
+                        navController.navigate("profile")
+                    }
+                )
+            }
+        }
+    ) { innerPadding ->
         if (!isLoggedIn) {
             // User not logged in
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -72,7 +132,9 @@ fun FavoritesScreen(
         } else if (isLoading) {
             // Loading state
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()
@@ -80,7 +142,9 @@ fun FavoritesScreen(
         } else if (favoriteMangas.isEmpty()) {
             // No favorites
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -90,16 +154,23 @@ fun FavoritesScreen(
             }
         } else {
             // Display favorites in a grid
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 16.dp)
             ) {
-                items(favoriteMangas) { manga ->
-                    FavoriteMangaItem(
-                        manga = manga,
-                        onMangaClick = { navController.navigate("chapters/${manga.id}") }
-                    )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(favoriteMangas) { manga ->
+                        FavoriteMangaItem(
+                            manga = manga,
+                            onMangaClick = { navController.navigate("chapters/${manga.id}") }
+                        )
+                    }
                 }
             }
         }
