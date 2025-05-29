@@ -94,5 +94,10 @@ fun MangaReaderApp() {
         composable("history") {
             HistoryScreen(navController)
         }
+
+        // Màn hình yêu thích
+        composable("favorites") {
+            FavoritesScreen(navController)
+        }
     }
 }

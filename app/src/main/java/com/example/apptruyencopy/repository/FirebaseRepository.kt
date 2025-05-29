@@ -240,7 +240,7 @@ class FirebaseRepository {
     suspend fun getFavoriteMangas(userId: String): List<String> {
         return try {
             val user = getUser(userId)
-            user?.favoriteMangaIds ?: emptyList()
+            user?.favoriteManga ?: emptyList()
         } catch (e: Exception) {
             emptyList()
         }

@@ -4,6 +4,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,6 +17,7 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.apptruyencopy.di.AppViewModelProvider
 import com.example.apptruyencopy.viewmodel.ChaptersViewModel
+import com.google.firebase.auth.FirebaseAuth
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -28,7 +32,9 @@ fun ChaptersScreen(
     val selectedLanguage by viewModel.selectedLanguage
     val isLoading by viewModel.isLoading
     val totalEnChapters by viewModel.totalEnChapters
+    val isFavorite by viewModel.isFavorite
     val languageOptions = viewModel.languageOptions
+    val isLoggedIn = FirebaseAuth.getInstance().currentUser != null
     
     LaunchedEffect(mangaId) {
         viewModel.loadMangaDetail(mangaId)
@@ -52,13 +58,32 @@ fun ChaptersScreen(
             } ?: ""
 
             Column(modifier = Modifier.padding(16.dp)) {
-                AsyncImage(
-                    model = coverUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                )
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    AsyncImage(
+                        model = coverUrl,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                    )
+                    
+                    // Favorite Button
+                    if (isLoggedIn) {
+                        IconButton(
+                            onClick = { viewModel.toggleFavorite(mangaId) },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+                
                 Text("Tựa: $title", style = MaterialTheme.typography.titleMedium)
                 Text("Tác giả: $authors", style = MaterialTheme.typography.bodyMedium)
                 Text("Thể loại: ${tags.joinToString()}", style = MaterialTheme.typography.bodySmall)

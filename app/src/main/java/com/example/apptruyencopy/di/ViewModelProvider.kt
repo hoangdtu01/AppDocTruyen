@@ -11,6 +11,7 @@ import com.example.apptruyencopy.repository.FirebaseRepository
 import com.example.apptruyencopy.repository.MangaRepository
 import com.example.apptruyencopy.viewmodel.AuthViewModel
 import com.example.apptruyencopy.viewmodel.ChaptersViewModel
+import com.example.apptruyencopy.viewmodel.FavoritesViewModel
 import com.example.apptruyencopy.viewmodel.GenresViewModel
 import com.example.apptruyencopy.viewmodel.HomeViewModel
 import com.example.apptruyencopy.viewmodel.ReaderViewModel
@@ -32,7 +33,7 @@ object AppViewModelProvider {
         }
         
         initializer {
-            ChaptersViewModel(repository)
+            ChaptersViewModel(repository, firebaseRepository)
         }
         
         initializer {
@@ -49,6 +50,10 @@ object AppViewModelProvider {
 
         initializer {
             UserViewModel(firebaseRepository)
+        }
+        
+        initializer {
+            FavoritesViewModel(firebaseRepository, repository)
         }
     }
 }

@@ -9,8 +9,7 @@ data class FirebaseUser(
     val userId: String = "",
     val name: String = "",
     val email: String = "",
-    @PropertyName("favoriteManga")
-    val favoriteMangaIds: List<String> = emptyList()
+    var favoriteManga: List<String> = emptyList()
 )
 
 data class ReadingHistory(

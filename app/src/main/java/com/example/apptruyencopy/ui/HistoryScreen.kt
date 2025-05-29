@@ -60,14 +60,14 @@ fun HistoryScreen(
         },
         bottomBar = {
             NavigationBar {
-                // Tủ sách
+                // Yêu thích
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Bookmarks, contentDescription = "Tủ sách") },
-                    label = { Text("Tủ sách") },
+                    icon = { Icon(Icons.Default.Bookmarks, contentDescription = "Yêu thích") },
+                    label = { Text("Yêu thích") },
                     selected = selectedTab == 0,
                     onClick = { 
                         selectedTab = 0
-                        navController.navigate("bookmarks")
+                        navController.navigate("favorites")
                     }
                 )
                 
