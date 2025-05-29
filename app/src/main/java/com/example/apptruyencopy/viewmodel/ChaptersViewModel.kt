@@ -6,10 +6,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.apptruyencopy.model.Chapter
 import com.example.apptruyencopy.model.Manga
+import com.example.apptruyencopy.repository.FirebaseRepository
 import com.example.apptruyencopy.repository.MangaRepository
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 
-class ChaptersViewModel(private val repository: MangaRepository) : ViewModel() {
+class ChaptersViewModel(
+    private val repository: MangaRepository,
+    private val firebaseRepository: FirebaseRepository = FirebaseRepository()
+) : ViewModel() {
+    
+    private val auth = FirebaseAuth.getInstance()
     
     private val _manga = mutableStateOf<Manga?>(null)
     val manga: State<Manga?> = _manga
@@ -26,6 +33,9 @@ class ChaptersViewModel(private val repository: MangaRepository) : ViewModel() {
     private val _totalEnChapters = mutableStateOf(0)
     val totalEnChapters: State<Int> = _totalEnChapters
     
+    private val _isFavorite = mutableStateOf(false)
+    val isFavorite: State<Boolean> = _isFavorite
+    
     val languageOptions = mapOf("vi" to "Tiếng Việt", "en" to "Tiếng Anh")
     
     fun loadMangaDetail(mangaId: String) {
@@ -37,6 +47,40 @@ class ChaptersViewModel(private val repository: MangaRepository) : ViewModel() {
                 // Lấy tổng số chapter tiếng Anh
                 val total = repository.getChapterCount(mangaId, "en")
                 _totalEnChapters.value = total
+                
+                // Check if manga is in favorites
+                checkFavoriteStatus(mangaId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    private fun checkFavoriteStatus(mangaId: String) {
+        val userId = auth.currentUser?.uid ?: return
+        
+        viewModelScope.launch {
+            try {
+                val favorites = firebaseRepository.getFavoriteMangas(userId)
+                _isFavorite.value = favorites.contains(mangaId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    fun toggleFavorite(mangaId: String) {
+        if (auth.currentUser == null) return
+        
+        viewModelScope.launch {
+            try {
+                if (_isFavorite.value) {
+                    firebaseRepository.removeFromFavorites(mangaId)
+                } else {
+                    firebaseRepository.addToFavorites(mangaId)
+                }
+                // Update the favorite status
+                _isFavorite.value = !_isFavorite.value
             } catch (e: Exception) {
                 e.printStackTrace()
             }

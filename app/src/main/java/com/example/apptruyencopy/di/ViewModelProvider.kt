@@ -7,12 +7,14 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.apptruyencopy.model.RetrofitClient
 import com.example.apptruyencopy.repository.AuthRepository
+import com.example.apptruyencopy.repository.FirebaseRepository
 import com.example.apptruyencopy.repository.MangaRepository
 import com.example.apptruyencopy.viewmodel.AuthViewModel
 import com.example.apptruyencopy.viewmodel.ChaptersViewModel
 import com.example.apptruyencopy.viewmodel.GenresViewModel
 import com.example.apptruyencopy.viewmodel.HomeViewModel
 import com.example.apptruyencopy.viewmodel.ReaderViewModel
+import com.example.apptruyencopy.viewmodel.UserViewModel
 
 /**
  * Factory để tạo các ViewModel
@@ -22,6 +24,7 @@ object AppViewModelProvider {
         // Khởi tạo Repository
         val repository = MangaRepository(RetrofitClient.mangaDexApi)
         val authRepository = AuthRepository()
+        val firebaseRepository = FirebaseRepository()
         
         // Khởi tạo các ViewModel
         initializer {
@@ -33,7 +36,7 @@ object AppViewModelProvider {
         }
         
         initializer {
-            ReaderViewModel(repository)
+            ReaderViewModel(repository, firebaseRepository)
         }
         
         initializer {
@@ -42,6 +45,10 @@ object AppViewModelProvider {
         
         initializer {
             GenresViewModel(repository)
+        }
+
+        initializer {
+            UserViewModel(firebaseRepository)
         }
     }
 }

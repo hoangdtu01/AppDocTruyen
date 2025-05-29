@@ -12,18 +12,16 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.example.apptruyencopy.model.RetrofitClient
-import com.example.apptruyencopy.repository.MangaRepository
+import com.example.apptruyencopy.di.AppViewModelProvider
 import com.example.apptruyencopy.viewmodel.ChaptersViewModel
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 @Composable
 fun ChaptersScreen(
     navController: NavController, 
     mangaId: String,
-    viewModel: ChaptersViewModel = viewModel {
-        val repository = MangaRepository(RetrofitClient.mangaDexApi)
-        ChaptersViewModel(repository)
-    }
+    viewModel: ChaptersViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val manga by viewModel.manga
     val chapters by viewModel.chapters
@@ -51,7 +49,7 @@ fun ChaptersScreen(
 
             val coverUrl = coverFileName?.let { fileName ->
                 "https://uploads.mangadex.org/covers/${it.id}/$fileName"
-            }
+            } ?: ""
 
             Column(modifier = Modifier.padding(16.dp)) {
                 AsyncImage(
@@ -97,15 +95,37 @@ fun ChaptersScreen(
         } else {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(chapters) { chapter ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp)
-                            .clickable { navController.navigate("reader/${chapter.id}") },
-                        elevation = CardDefaults.cardElevation(4.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("Chapter ${chapter.attributes.chapter ?: "?"}")
+                    // Gather data needed for reading history
+                    val currentManga = manga
+                    if (currentManga != null) {
+                        val title = currentManga.attributes.title["en"] 
+                            ?: currentManga.attributes.title.values.firstOrNull() 
+                            ?: "No title"
+                        
+                        val coverRel = currentManga.relationships.find { rel -> rel.type == "cover_art" }
+                        val coverFileName = coverRel?.attributes?.fileName
+                        val coverUrl = coverFileName?.let { fileName ->
+                            "https://uploads.mangadex.org/covers/${currentManga.id}/$fileName"
+                        } ?: ""
+                        
+                        // Encode title and coverUrl for navigation
+                        val encodedTitle = URLEncoder.encode(title, StandardCharsets.UTF_8.toString())
+                        val encodedCoverUrl = URLEncoder.encode(coverUrl, StandardCharsets.UTF_8.toString())
+                        
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp)
+                                .clickable { 
+                                    navController.navigate(
+                                        "reader/${chapter.id}/${mangaId}/${encodedTitle}/${encodedCoverUrl}"
+                                    ) 
+                                },
+                            elevation = CardDefaults.cardElevation(4.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text("Chapter ${chapter.attributes.chapter ?: "?"}")
+                            }
                         }
                     }
                 }

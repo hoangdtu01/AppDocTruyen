@@ -11,24 +11,70 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
-import com.example.apptruyencopy.model.RetrofitClient
-import com.example.apptruyencopy.repository.MangaRepository
+import com.example.apptruyencopy.di.AppViewModelProvider
 import com.example.apptruyencopy.viewmodel.ReaderViewModel
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun ReaderScreen(
     chapterId: String,
-    viewModel: ReaderViewModel = viewModel {
-        val repository = MangaRepository(RetrofitClient.mangaDexApi)
-        ReaderViewModel(repository)
-    }
+    mangaId: String,
+    title: String,
+    coverUrl: String,
+    navController: NavController? = null,
+    viewModel: ReaderViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val pageUrls by viewModel.pageUrls
     val isLoading by viewModel.isLoading
+    val saveHistoryStatus by viewModel.saveHistoryStatus
+    
+    // Check authentication state
+    val auth = FirebaseAuth.getInstance()
+    val isUserLoggedIn = remember { auth.currentUser != null }
+    
+    // State for login dialog
+    var showLoginPrompt by remember { mutableStateOf(false) }
     
     LaunchedEffect(chapterId) {
         viewModel.loadChapterPages(chapterId)
+        
+        // Save reading history when the chapter is loaded (if user is logged in)
+        viewModel.saveReadingHistory(
+            mangaId = mangaId,
+            chapterId = chapterId,
+            title = title,
+            coverUrl = coverUrl
+        )
+    }
+    
+    // Show login prompt dialog if saving failed due to no authentication
+    LaunchedEffect(saveHistoryStatus) {
+        if (saveHistoryStatus == false && !isUserLoggedIn) {
+            showLoginPrompt = true
+        }
+    }
+
+    if (showLoginPrompt) {
+        AlertDialog(
+            onDismissRequest = { showLoginPrompt = false },
+            title = { Text("Đăng nhập để lưu lịch sử") },
+            text = { Text("Bạn cần đăng nhập để lưu lịch sử đọc truyện. Bạn có muốn đăng nhập ngay bây giờ không?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    navController?.navigate("login")
+                    showLoginPrompt = false
+                }) {
+                    Text("Đăng nhập")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLoginPrompt = false }) {
+                    Text("Bỏ qua")
+                }
+            }
+        )
     }
 
     if (isLoading || pageUrls.isEmpty()) {

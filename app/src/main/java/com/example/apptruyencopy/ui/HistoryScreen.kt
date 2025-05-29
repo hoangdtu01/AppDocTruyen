@@ -21,9 +21,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
+import com.example.apptruyencopy.di.AppViewModelProvider
 import com.example.apptruyencopy.model.ReadingHistory
-import com.example.apptruyencopy.repository.FirebaseRepository
 import com.example.apptruyencopy.viewmodel.UserViewModel
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -31,7 +33,7 @@ import java.util.*
 @Composable
 fun HistoryScreen(
     navController: NavController,
-    viewModel: UserViewModel = viewModel { UserViewModel(FirebaseRepository()) }
+    viewModel: UserViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     var selectedTab by remember { mutableStateOf(3) } // Tab "Lịch sử" là số 3
     val readingHistory by viewModel.readingHistory
@@ -44,6 +46,14 @@ fun HistoryScreen(
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Quay lại")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { 
+                        // Show dialog to confirm clearing history
+                        // viewModel.clearReadingHistory()
+                    }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Xóa lịch sử")
                     }
                 }
             )
@@ -137,7 +147,13 @@ fun HistoryScreen(
                 items(readingHistory) { history ->
                     HistoryItem(
                         history = history,
-                        onItemClick = { navController.navigate("chapters/${history.mangaId}") }
+                        onItemClick = { navController.navigate("chapters/${history.mangaId}") },
+                        onReadClick = {
+                            // Navigate directly to continue reading the chapter
+                            val encodedTitle = URLEncoder.encode(history.title, StandardCharsets.UTF_8.toString())
+                            val encodedCoverUrl = URLEncoder.encode(history.coverUrl, StandardCharsets.UTF_8.toString())
+                            navController.navigate("reader/${history.chapterId}/${history.mangaId}/${encodedTitle}/${encodedCoverUrl}")
+                        }
                     )
                 }
 
@@ -173,7 +189,8 @@ fun HistoryScreen(
 @Composable
 fun HistoryItem(
     history: ReadingHistory,
-    onItemClick: () -> Unit
+    onItemClick: () -> Unit,
+    onReadClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -226,6 +243,15 @@ fun HistoryItem(
                     text = formatTimestamp(history.timestamp.toDate()),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            // Button to continue reading
+            IconButton(onClick = onReadClick) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "Tiếp tục đọc",
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
         }
