@@ -4,11 +4,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -17,6 +20,7 @@ import com.example.apptruyencopy.di.AppViewModelProvider
 import com.example.apptruyencopy.viewmodel.ReaderViewModel
 import com.google.firebase.auth.FirebaseAuth
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReaderScreen(
     chapterId: String,
@@ -56,49 +60,77 @@ fun ReaderScreen(
         }
     }
 
-    if (showLoginPrompt) {
-        AlertDialog(
-            onDismissRequest = { showLoginPrompt = false },
-            title = { Text("Đăng nhập để lưu lịch sử") },
-            text = { Text("Bạn cần đăng nhập để lưu lịch sử đọc truyện. Bạn có muốn đăng nhập ngay bây giờ không?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    navController?.navigate("login")
-                    showLoginPrompt = false
-                }) {
-                    Text("Đăng nhập")
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = title,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = { navController?.navigateUp() }) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLoginPrompt = false }) {
-                    Text("Bỏ qua")
-                }
-            }
-        )
-    }
-
-    if (isLoading || pageUrls.isEmpty()) {
-        // Loading Indicator
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            )
         }
-    } else {
-        // Hiển thị các trang ảnh
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(pageUrls) { pageUrl ->
-                Image(
-                    painter = rememberAsyncImagePainter(model = pageUrl),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(0.7f), // chỉnh tùy tỉ lệ hình
-                    contentScale = ContentScale.FillWidth
-                )
+    ) { paddingValues ->
+        if (showLoginPrompt) {
+            AlertDialog(
+                onDismissRequest = { showLoginPrompt = false },
+                title = { Text("Đăng nhập để lưu lịch sử") },
+                text = { Text("Bạn cần đăng nhập để lưu lịch sử đọc truyện. Bạn có muốn đăng nhập ngay bây giờ không?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        navController?.navigate("login")
+                        showLoginPrompt = false
+                    }) {
+                        Text("Đăng nhập")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showLoginPrompt = false }) {
+                        Text("Bỏ qua")
+                    }
+                }
+            )
+        }
+
+        if (isLoading || pageUrls.isEmpty()) {
+            // Loading Indicator
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else {
+            // Hiển thị các trang ảnh
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(horizontal = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(pageUrls) { pageUrl ->
+                    Image(
+                        painter = rememberAsyncImagePainter(model = pageUrl),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(0.7f), // chỉnh tùy tỉ lệ hình
+                        contentScale = ContentScale.FillWidth
+                    )
+                }
             }
         }
     }

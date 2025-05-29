@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.apptruyencopy.model.Chapter
+import com.example.apptruyencopy.model.Comment
 import com.example.apptruyencopy.model.Manga
 import com.example.apptruyencopy.repository.FirebaseRepository
 import com.example.apptruyencopy.repository.MangaRepository
@@ -36,6 +37,16 @@ class ChaptersViewModel(
     private val _isFavorite = mutableStateOf(false)
     val isFavorite: State<Boolean> = _isFavorite
     
+    // Comment states
+    private val _comments = mutableStateOf<List<Comment>>(emptyList())
+    val comments: State<List<Comment>> = _comments
+    
+    private val _isCommentsLoading = mutableStateOf(false)
+    val isCommentsLoading: State<Boolean> = _isCommentsLoading
+    
+    private val _commentText = mutableStateOf("")
+    val commentText: State<String> = _commentText
+    
     val languageOptions = mapOf("vi" to "Tiếng Việt", "en" to "Tiếng Anh")
     
     fun loadMangaDetail(mangaId: String) {
@@ -50,6 +61,9 @@ class ChaptersViewModel(
                 
                 // Check if manga is in favorites
                 checkFavoriteStatus(mangaId)
+                
+                // Load comments for this manga
+                loadComments(mangaId)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -103,5 +117,53 @@ class ChaptersViewModel(
     fun changeLanguage(language: String, mangaId: String) {
         _selectedLanguage.value = language
         loadChapters(mangaId)
+    }
+    
+    // Comment related functions
+    fun loadComments(mangaId: String) {
+        _isCommentsLoading.value = true
+        viewModelScope.launch {
+            try {
+                val commentsList = firebaseRepository.getComments(mangaId)
+                _comments.value = commentsList
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            _isCommentsLoading.value = false
+        }
+    }
+    
+    fun updateCommentText(text: String) {
+        _commentText.value = text
+    }
+    
+    fun addComment(mangaId: String) {
+        if (_commentText.value.isBlank() || auth.currentUser == null) return
+        
+        viewModelScope.launch {
+            try {
+                firebaseRepository.addComment(mangaId, _commentText.value)
+                // Clear the comment text field
+                _commentText.value = ""
+                // Reload comments to show the new one
+                loadComments(mangaId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    fun deleteComment(commentId: String, mangaId: String) {
+        if (auth.currentUser == null) return
+        
+        viewModelScope.launch {
+            try {
+                firebaseRepository.deleteComment(commentId)
+                // Reload comments to reflect the deletion
+                loadComments(mangaId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 } 
