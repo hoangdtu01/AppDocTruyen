@@ -61,5 +61,9 @@ fun MangaReaderApp() {
         composable("search") {
             SearchScreen(navController)
         }
+
+        composable("history") {
+            HistoryScreen(navController)
+        }
     }
 }

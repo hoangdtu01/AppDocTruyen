@@ -155,8 +155,7 @@ fun HomeScreen(
                     selected = selectedTab == 3,
                     onClick = { 
                         selectedTab = 3
-                        // Chức năng này sẽ làm sau
-                        // navController.navigate("history") 
+                        navController.navigate("history") 
                     }
                 )
                 
