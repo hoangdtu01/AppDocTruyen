@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "95773889797",
+    "project_id": "apptruyencopy",
+    "storage_bucket": "apptruyencopy.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:95773889797:android:61a414b64d61149580536c",
+        "android_client_info": {
+          "package_name": "com.example.apptruyencopy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAxeqeoLdSzo0Dt016zq1A55OjZhBnLyAw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
