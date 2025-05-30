@@ -99,7 +99,12 @@ class ChaptersViewModel(
             _isLoading.value = false
         }
     }
-    
+
+
+    /*
+        * Toggle favorite status for the manga.
+        * If the user is logged in, it will add or remove the manga from their favorites.
+     */
     fun toggleFavorite(mangaId: String) {
         if (auth.currentUser == null) return
         

@@ -102,13 +102,9 @@ fun ReaderScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = { 
-                        // Navigate directly to the chapters screen instead of popping back stack
-                        navController?.navigate("chapters/$mangaId") {
-                            // Clear the back stack up to the chapters screen
-                            popUpTo("chapters/$mangaId") {
-                                inclusive = false
-                            }
-                        }
+                        // Modified navigation logic: use popBackStack() instead of navigate()
+                        // to properly handle back navigation
+                        navController?.popBackStack()
                     }) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
@@ -129,7 +125,12 @@ fun ReaderScreen(
                         if (prevChapterId != null) {
                             val encodedTitle = URLEncoder.encode(title, StandardCharsets.UTF_8.toString())
                             val encodedCoverUrl = URLEncoder.encode(coverUrl, StandardCharsets.UTF_8.toString())
-                            navController?.navigate("reader/${prevChapterId}/${mangaId}/${encodedTitle}/${encodedCoverUrl}")
+                            navController?.navigate("reader/${prevChapterId}/${mangaId}/${encodedTitle}/${encodedCoverUrl}") {
+                                // Replace the current screen instead of adding to back stack
+                                popUpTo(navController.currentBackStackEntry?.destination?.route ?: "") {
+                                    inclusive = true
+                                }
+                            }
                         }
                     },
                     enabled = hasPrevChapter
@@ -168,7 +169,12 @@ fun ReaderScreen(
                         if (nextChapterId != null) {
                             val encodedTitle = URLEncoder.encode(title, StandardCharsets.UTF_8.toString())
                             val encodedCoverUrl = URLEncoder.encode(coverUrl, StandardCharsets.UTF_8.toString())
-                            navController?.navigate("reader/${nextChapterId}/${mangaId}/${encodedTitle}/${encodedCoverUrl}")
+                            navController?.navigate("reader/${nextChapterId}/${mangaId}/${encodedTitle}/${encodedCoverUrl}") {
+                                // Replace the current screen instead of adding to back stack
+                                popUpTo(navController.currentBackStackEntry?.destination?.route ?: "") {
+                                    inclusive = true
+                                }
+                            }
                         }
                     },
                     enabled = hasNextChapter
@@ -229,7 +235,12 @@ fun ReaderScreen(
                                         showChapterDialog = false
                                         val encodedTitle = URLEncoder.encode(title, StandardCharsets.UTF_8.toString())
                                         val encodedCoverUrl = URLEncoder.encode(coverUrl, StandardCharsets.UTF_8.toString())
-                                        navController?.navigate("reader/${chapter.id}/${mangaId}/${encodedTitle}/${encodedCoverUrl}")
+                                        navController?.navigate("reader/${chapter.id}/${mangaId}/${encodedTitle}/${encodedCoverUrl}") {
+                                            // Replace the current screen instead of adding to back stack
+                                            popUpTo(navController.currentBackStackEntry?.destination?.route ?: "") {
+                                                inclusive = true
+                                            }
+                                        }
                                     },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {

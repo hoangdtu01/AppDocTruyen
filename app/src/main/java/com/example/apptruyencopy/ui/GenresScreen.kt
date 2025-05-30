@@ -129,7 +129,7 @@ fun GenresScreen(
                     selected = selectedTab == 3,
                     onClick = { 
                         selectedTab = 3
-                        // navController.navigate("history")
+                        navController.navigate("history")
                     }
                 )
                 
