@@ -12,6 +12,7 @@ import com.example.apptruyencopy.repository.FirebaseRepository
 import com.example.apptruyencopy.repository.MangaRepository
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 class ChaptersViewModel(
     private val repository: MangaRepository,
@@ -256,6 +257,30 @@ class ChaptersViewModel(
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+    }
+    
+    // Helper method to get the rating count by integer score (1-5)
+    fun getRatingCountsByScore(): Map<Int, Int> {
+        val ratingsByScore = mutableMapOf<Int, Int>()
+        
+        for (rating in _ratings.value) {
+            // Convert float score (0-5) to integer score (1-5)
+            val score = convertRatingToStarCategory(rating.score)
+            ratingsByScore[score] = (ratingsByScore[score] ?: 0) + 1
+        }
+        
+        return ratingsByScore
+    }
+    
+    // Convert a raw rating score to a star category (1-5)
+    private fun convertRatingToStarCategory(score: Float): Int {
+        return when {
+            score >= 4.5f -> 5
+            score >= 3.5f -> 4
+            score >= 2.5f -> 3
+            score >= 1.5f -> 2
+            else -> 1
         }
     }
 } 

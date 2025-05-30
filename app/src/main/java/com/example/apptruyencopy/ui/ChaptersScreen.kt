@@ -1,24 +1,41 @@
 package com.example.apptruyencopy.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.StarHalf
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,6 +54,7 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,7 +111,10 @@ fun ChaptersScreen(
                             ?: manga?.attributes?.title?.values?.firstOrNull() 
                             ?: "Chi tiết truyện",
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold
+                        )
                     )
                 },
                 navigationIcon = {
@@ -103,7 +124,11 @@ fun ChaptersScreen(
                             contentDescription = "Quay lại"
                         )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             )
         }
     ) { innerPadding ->
@@ -111,14 +136,24 @@ fun ChaptersScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             // Tab Row
-            TabRow(selectedTabIndex = selectedTabIndex) {
+            TabRow(
+                selectedTabIndex = selectedTabIndex,
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary
+            ) {
                 tabs.forEachIndexed { index, title ->
                     Tab(
                         selected = selectedTabIndex == index,
                         onClick = { selectedTabIndex = index },
-                        text = { Text(title) }
+                        text = { 
+                            Text(
+                                text = title,
+                                fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Normal
+                            ) 
+                        }
                     )
                 }
             }
@@ -132,6 +167,8 @@ fun ChaptersScreen(
                     totalEnChapters = totalEnChapters,
                     onToggleFavorite = { viewModel.toggleFavorite(mangaId) },
                     averageRating = averageRating,
+                    ratingCount = ratings.size,
+                    ratingCountsByScore = viewModel.getRatingCountsByScore(),
                     onNavigateToRatingTab = { selectedTabIndex = 3 }
                 )
                 
@@ -181,12 +218,15 @@ fun IntroductionTab(
     totalEnChapters: Int,
     onToggleFavorite: () -> Unit,
     averageRating: Float = 0f,
+    ratingCount: Int = 0,
+    ratingCountsByScore: Map<Int, Int> = emptyMap(),
     onNavigateToRatingTab: () -> Unit = {}
 ) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 16.dp)
     ) {
         if (manga != null) {
             val title = manga.attributes.title["en"] ?: manga.attributes.title.values.firstOrNull() ?: "No title"
@@ -204,87 +244,298 @@ fun IntroductionTab(
 
             item {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        AsyncImage(
-                            model = coverUrl,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp)
-                        )
-                        
-                        // Favorite Button
-                        if (isLoggedIn) {
-                            IconButton(
-                                onClick = onToggleFavorite,
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp)
+                            .shadow(8.dp, RoundedCornerShape(16.dp)),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            AsyncImage(
+                                model = coverUrl,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
                                 modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                    contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
+                                    .fillMaxWidth()
+                                    .height(250.dp)
+                            )
+                            
+                            // Favorite Button
+                            if (isLoggedIn) {
+                                FloatingActionButton(
+                                    onClick = onToggleFavorite,
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(16.dp)
+                                        .size(48.dp),
+                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                        contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                                        tint = if (isFavorite) Color.Red else MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
                         }
                     }
                     
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Tựa: $title", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Tác giả: $authors", style = MaterialTheme.typography.bodyMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Thể loại: ${tags.joinToString()}", style = MaterialTheme.typography.bodySmall)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Tổng số chương (EN): $totalEnChapters", style = MaterialTheme.typography.bodySmall)
-                    
-                    // Rating information with button to navigate to rating tab
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable(onClick = onNavigateToRatingTab),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(bottom = 16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(4.dp)
                     ) {
-                        Text(
-                            text = "Đánh giá: ",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        StarRating(
-                            rating = averageRating,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (averageRating > 0) String.format("%.1f", averageRating) else "Chưa có đánh giá",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.weight(1f))
-                        TextButton(
-                            onClick = onNavigateToRatingTab,
-                            colors = ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.primary
-                            )
+                        Column(
+                            modifier = Modifier.padding(16.dp)
                         ) {
-                            Text("Đánh giá ngay")
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Tác giả:",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = authors,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            Text(
+                                text = "Thể loại:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                tags.forEach { tag ->
+                                    SuggestionChip(
+                                        onClick = { },
+                                        label = { Text(text = tag) },
+                                        colors = SuggestionChipDefaults.suggestionChipColors(
+                                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                                        ),
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    )
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            Text(
+                                text = "Tổng số chương (EN): $totalEnChapters",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
                         }
                     }
-                    
-                    // Description (if available)
+
+                    // Rating card
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        elevation = CardDefaults.cardElevation(4.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            Text(
+                                text = "Xem toàn bộ đánh giá",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Left side - Rating score
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .weight(0.3f)
+                                        .padding(end = 16.dp)
+                                ) {
+                                    Text(
+                                        text = if (averageRating > 0f) String.format("%.1f", averageRating) else "0.0",
+                                        style = MaterialTheme.typography.displayLarge,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    
+                                    Text(
+                                        text = "Sao",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    
+                                    Text(
+                                        text = "$ratingCount đánh giá",
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                }
+                                
+                                // Right side - Star breakdown
+                                Column(
+                                    modifier = Modifier.weight(0.7f)
+                                ) {
+                                    // 5 star rating bar
+                                    RatingBar(
+                                        starCount = 5, 
+                                        ratingCount = ratingCountsByScore.getOrDefault(5, 0),
+                                        totalRatings = ratingCount
+                                    )
+                                    
+                                    // 4 star rating bar
+                                    RatingBar(
+                                        starCount = 4,
+                                        ratingCount = ratingCountsByScore.getOrDefault(4, 0),
+                                        totalRatings = ratingCount
+                                    )
+                                    
+                                    // 3 star rating bar
+                                    RatingBar(
+                                        starCount = 3,
+                                        ratingCount = ratingCountsByScore.getOrDefault(3, 0),
+                                        totalRatings = ratingCount
+                                    )
+                                    
+                                    // 2 star rating bar
+                                    RatingBar(
+                                        starCount = 2,
+                                        ratingCount = ratingCountsByScore.getOrDefault(2, 0),
+                                        totalRatings = ratingCount
+                                    )
+                                    
+                                    // 1 star rating bar
+                                    RatingBar(
+                                        starCount = 1,
+                                        ratingCount = ratingCountsByScore.getOrDefault(1, 0),
+                                        totalRatings = ratingCount
+                                    )
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            // Filter buttons
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // "Cực phẩm" filter button
+                                FilterChip(
+                                    label = "Cực phẩm (${ratingCountsByScore.getOrDefault(5, 0) + ratingCountsByScore.getOrDefault(4, 0)})",
+                                    selected = false,
+                                    onClick = onNavigateToRatingTab
+                                )
+                                
+                                // "Tạm ổn" filter button
+                                FilterChip(
+                                    label = "Tạm ổn (${ratingCountsByScore.getOrDefault(3, 0)})",
+                                    selected = false,
+                                    onClick = onNavigateToRatingTab
+                                )
+                                
+                                // "Chưa ưng lắm" filter button
+                                FilterChip(
+                                    label = "Chưa ưng lắm (${ratingCountsByScore.getOrDefault(2, 0) + ratingCountsByScore.getOrDefault(1, 0)})",
+                                    selected = false,
+                                    onClick = onNavigateToRatingTab
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            // "Viết đánh giá" button
+                            OutlinedButton(
+                                onClick = onNavigateToRatingTab,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Send,
+                                        contentDescription = "Viết đánh giá",
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Viết đánh giá ~",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+
+                    // Description card (if available)
                     manga.attributes.description?.get("en")?.let { description ->
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Mô tả:",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = description,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            elevation = CardDefaults.cardElevation(4.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp)
+                            ) {
+                                Text(
+                                    text = "Mô tả",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                Text(
+                                    text = description,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -313,22 +564,59 @@ fun ChaptersTab(
     navController: NavController,
     onLanguageChange: (String) -> Unit
 ) {
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentPadding = PaddingValues(bottom = 16.dp)
+    ) {
         // Language selection
         item {
-            Row(
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                elevation = CardDefaults.cardElevation(4.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             ) {
-                languageOptions.forEach { (code, label) ->
-                    Button(
-                        onClick = { onLanguageChange(code) },
-                        enabled = selectedLanguage != code,
-                        modifier = Modifier.padding(horizontal = 4.dp)
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "Ngôn ngữ",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(text = label)
+                        languageOptions.forEach { (code, label) ->
+                            val isSelected = selectedLanguage == code
+                            FilledTonalButton(
+                                onClick = { if (!isSelected) onLanguageChange(code) },
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = if (isSelected) 
+                                        MaterialTheme.colorScheme.primary 
+                                    else 
+                                        MaterialTheme.colorScheme.secondaryContainer,
+                                    contentColor = if (isSelected) 
+                                        MaterialTheme.colorScheme.onPrimary 
+                                    else 
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                ),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -336,12 +624,24 @@ fun ChaptersTab(
 
         // Chapter list header
         item {
-            Text(
-                text = "Danh sách chương",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(16.dp),
-                textAlign = TextAlign.Center
-            )
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ),
+                elevation = CardDefaults.cardElevation(4.dp)
+            ) {
+                Text(
+                    text = "Danh sách chương",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(16.dp),
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
         }
 
         // Chapter list
@@ -358,13 +658,28 @@ fun ChaptersTab(
             }
         } else if (chapters.isEmpty()) {
             item {
-                Box(
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(100.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(16.dp),
+                    elevation = CardDefaults.cardElevation(4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
                 ) {
-                    Text("Không có chapter ${languageOptions[selectedLanguage]?.lowercase()}")
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "Không có chapter ${languageOptions[selectedLanguage]?.lowercase()}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
                 }
             }
         } else {
@@ -390,15 +705,56 @@ fun ChaptersTab(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .shadow(2.dp, RoundedCornerShape(8.dp))
                             .clickable { 
                                 navController.navigate(
                                     "reader/${chapter.id}/${currentManga.id}/${encodedTitle}/${encodedCoverUrl}"
                                 ) 
                             },
-                        elevation = CardDefaults.cardElevation(4.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("Chapter ${chapter.attributes.chapter ?: "?"}")
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Chapter number with circle background
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primary),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${chapter.attributes.chapter ?: "?"}",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.width(16.dp))
+                            
+                            Column {
+                                Text(
+                                    text = "Chapter ${chapter.attributes.chapter ?: "?"}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                
+                                // Only show chapter numbers in this version since the Chapter model doesn't have a title field
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Nhấn để đọc",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
@@ -419,35 +775,56 @@ fun CommentsTab(
 ) {
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
     
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         // Add comment input field (only if logged in)
         if (isLoggedIn) {
             item {
-                Row(
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = commentText,
-                        onValueChange = onCommentTextChange,
-                        placeholder = { Text("Viết bình luận của bạn...") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp),
-                        maxLines = 3
+                    elevation = CardDefaults.cardElevation(4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
                     )
-                    
-                    IconButton(
-                        onClick = onAddComment,
-                        enabled = commentText.isNotBlank()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Send,
-                            contentDescription = "Gửi bình luận",
-                            tint = if (commentText.isBlank()) Color.Gray else MaterialTheme.colorScheme.primary
+                        OutlinedTextField(
+                            value = commentText,
+                            onValueChange = onCommentTextChange,
+                            placeholder = { Text("Viết bình luận của bạn...") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp),
+                            maxLines = 3
                         )
+                        
+                        FloatingActionButton(
+                            onClick = { if (commentText.isNotBlank()) onAddComment() },
+                            containerColor = if (commentText.isBlank()) 
+                                MaterialTheme.colorScheme.surfaceVariant
+                            else 
+                                MaterialTheme.colorScheme.primary,
+                            contentColor = if (commentText.isBlank())
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            else
+                                MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Send,
+                                contentDescription = "Gửi bình luận"
+                            )
+                        }
                     }
                 }
             }
@@ -457,17 +834,37 @@ fun CommentsTab(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
-                ) {
-                    Text(
-                        "Đăng nhập để bình luận",
-                        modifier = Modifier
-                            .padding(16.dp)
-                            .align(Alignment.CenterHorizontally),
-                        style = MaterialTheme.typography.bodyMedium
+                    elevation = CardDefaults.cardElevation(4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
                     )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            "Đăng nhập để bình luận",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
+        }
+        
+        // Comments header
+        item {
+            Text(
+                text = "Bình luận",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
         }
         
         // Comments list
@@ -484,13 +881,28 @@ fun CommentsTab(
             }
         } else if (comments.isEmpty()) {
             item {
-                Box(
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    contentAlignment = Alignment.Center
+                    elevation = CardDefaults.cardElevation(4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 ) {
-                    Text("Chưa có bình luận nào. Hãy là người đầu tiên bình luận!")
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "Chưa có bình luận nào. Hãy là người đầu tiên bình luận!",
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         } else {
@@ -524,8 +936,13 @@ fun CommentItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        elevation = CardDefaults.cardElevation(2.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .shadow(2.dp, RoundedCornerShape(8.dp)),
+        shape = RoundedCornerShape(8.dp),
+        elevation = CardDefaults.cardElevation(2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -541,47 +958,47 @@ fun CommentItem(
                     // User avatar placeholder
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.primary),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = comment.userName.take(1).uppercase(),
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             fontWeight = FontWeight.Bold
                         )
                     }
                     
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     
                     Column {
                         Text(
                             text = comment.userName,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = formattedDate,
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
                 
                 // Delete button (only visible to comment author)
                 if (currentUserId == comment.userId) {
-                    IconButton(onClick = onDelete) {
+                    IconButton(onClick = { onDelete() }) {
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Xóa bình luận",
-                            tint = Color.Red.copy(alpha = 0.7f)
+                            tint = MaterialTheme.colorScheme.error
                         )
                     }
                 }
             }
             
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             
             Text(
                 text = comment.content,
@@ -607,47 +1024,64 @@ fun RatingsTab(
 ) {
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
     
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         // Average rating display
         item {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                elevation = CardDefaults.cardElevation(4.dp)
+                    .padding(16.dp)
+                    .shadow(4.dp, RoundedCornerShape(12.dp)),
+                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(4.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         text = "Đánh giá trung bình",
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
                     
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = String.format("%.1f", averageRating),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold
+                            style = MaterialTheme.typography.displayMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        Spacer(modifier = Modifier.width(16.dp))
+                        
                         // Star rating display
                         StarRating(
                             rating = averageRating,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                     
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
                     Text(
                         text = "${ratings.size} đánh giá",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.Gray
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                     )
                 }
             }
@@ -659,8 +1093,13 @@ fun RatingsTab(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    elevation = CardDefaults.cardElevation(4.dp)
+                        .padding(16.dp)
+                        .shadow(4.dp, RoundedCornerShape(12.dp)),
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = CardDefaults.cardElevation(4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
                 ) {
                     Column(
                         modifier = Modifier
@@ -669,19 +1108,22 @@ fun RatingsTab(
                     ) {
                         Text(
                             text = if (userRating == null) "Đánh giá của bạn" else "Cập nhật đánh giá",
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
                         
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
                         
                         // Star rating input
                         StarRatingInput(
                             rating = ratingScore,
                             onRatingChange = onRatingScoreChange,
-                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(vertical = 8.dp)
                         )
                         
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
                         
                         // Review text input
                         OutlinedTextField(
@@ -690,10 +1132,11 @@ fun RatingsTab(
                             label = { Text("Đánh giá của bạn (không bắt buộc)") },
                             modifier = Modifier.fillMaxWidth(),
                             minLines = 3,
-                            maxLines = 5
+                            maxLines = 5,
+                            shape = RoundedCornerShape(8.dp)
                         )
                         
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
                         
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -703,19 +1146,27 @@ fun RatingsTab(
                                 OutlinedButton(
                                     onClick = { onDeleteRating(userRating.ratingId) },
                                     colors = ButtonDefaults.outlinedButtonColors(
-                                        contentColor = Color.Red
+                                        contentColor = MaterialTheme.colorScheme.error
                                     ),
-                                    modifier = Modifier.padding(end = 8.dp)
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+                                    modifier = Modifier.padding(end = 16.dp)
                                 ) {
-                                    Text("Xóa")
+                                    Text(
+                                        "Xóa",
+                                        fontWeight = FontWeight.Medium
+                                    )
                                 }
                             }
                             
                             Button(
                                 onClick = onSubmitRating,
-                                enabled = ratingScore > 0
+                                enabled = ratingScore > 0,
+                                shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text(if (userRating == null) "Gửi đánh giá" else "Cập nhật")
+                                Text(
+                                    if (userRating == null) "Gửi đánh giá" else "Cập nhật",
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
                         }
                     }
@@ -727,15 +1178,25 @@ fun RatingsTab(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
-                ) {
-                    Text(
-                        "Đăng nhập để đánh giá",
-                        modifier = Modifier
-                            .padding(16.dp)
-                            .align(Alignment.CenterHorizontally),
-                        style = MaterialTheme.typography.bodyMedium
+                    elevation = CardDefaults.cardElevation(4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
                     )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            "Đăng nhập để đánh giá",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }
@@ -745,7 +1206,8 @@ fun RatingsTab(
             Text(
                 text = "Tất cả đánh giá",
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(16.dp)
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
         }
         
@@ -763,13 +1225,28 @@ fun RatingsTab(
             }
         } else if (ratings.isEmpty()) {
             item {
-                Box(
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    contentAlignment = Alignment.Center
+                    elevation = CardDefaults.cardElevation(4.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 ) {
-                    Text("Chưa có đánh giá nào. Hãy là người đầu tiên đánh giá!")
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "Chưa có đánh giá nào. Hãy là người đầu tiên đánh giá!",
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         } else {
@@ -803,8 +1280,13 @@ fun RatingItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        elevation = CardDefaults.cardElevation(2.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .shadow(2.dp, RoundedCornerShape(8.dp)),
+        shape = RoundedCornerShape(8.dp),
+        elevation = CardDefaults.cardElevation(2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -820,30 +1302,30 @@ fun RatingItem(
                     // User avatar placeholder
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.primary),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = rating.userName.take(1).uppercase(),
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onPrimary,
                             fontWeight = FontWeight.Bold
                         )
                     }
                     
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     
                     Column {
                         Text(
                             text = rating.userName,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = formattedDate,
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -854,23 +1336,23 @@ fun RatingItem(
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Xóa đánh giá",
-                            tint = Color.Red.copy(alpha = 0.7f)
+                            tint = MaterialTheme.colorScheme.error
                         )
                     }
                 }
             }
             
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             
             // Rating stars
             StarRating(
                 rating = rating.score,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(24.dp)
             )
             
             // Review content if it exists
             if (rating.review.isNotBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = rating.review,
                     style = MaterialTheme.typography.bodyMedium
@@ -885,26 +1367,34 @@ fun StarRating(
     rating: Float,
     modifier: Modifier = Modifier
 ) {
-    Row {
+    Row(
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         repeat(5) { index ->
             val starFilled = rating > index
             val starPartiallyFilled = rating > index && rating < index + 1
             
-            if (starPartiallyFilled) {
-                // This would be a partially filled star, but for simplicity we'll use filled stars
-                Icon(
-                    imageVector = Icons.Default.Favorite,
-                    contentDescription = null,
-                    tint = Color(0xFFFFD700),
-                    modifier = modifier
-                )
-            } else {
-                Icon(
-                    imageVector = if (starFilled) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = null,
-                    tint = Color(0xFFFFD700),
-                    modifier = modifier
-                )
+            Box(
+                modifier = Modifier.padding(horizontal = 2.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (starPartiallyFilled) {
+                    // Use a dedicated half-star icon for better visual representation
+                    Icon(
+                        imageVector = Icons.Default.StarHalf,
+                        contentDescription = null,
+                        tint = Color(0xFFFFD700),
+                        modifier = modifier
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (starFilled) Icons.Default.Star else Icons.Default.StarBorder,
+                        contentDescription = null,
+                        tint = Color(0xFFFFD700),
+                        modifier = modifier
+                    )
+                }
             }
         }
     }
@@ -916,18 +1406,137 @@ fun StarRatingInput(
     onRatingChange: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(modifier = modifier) {
-        repeat(5) { index ->
-            IconButton(
-                onClick = { onRatingChange(index + 1f) }
-            ) {
-                Icon(
-                    imageVector = if (rating > index) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = "Star ${index + 1}",
-                    tint = Color(0xFFFFD700),
-                    modifier = Modifier.size(32.dp)
-                )
+    // Animate the scale of stars
+    val animatedScale by animateFloatAsState(
+        targetValue = if (rating > 0) 1.05f else 1f,
+        animationSpec = tween(200, easing = FastOutSlowInEasing)
+    )
+    
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(vertical = 8.dp)
+        ) {
+            repeat(5) { index ->
+                val isActive = rating > index
+                val starScale = if (isActive) animatedScale else 1f
+                
+                IconButton(
+                    onClick = { onRatingChange(index + 1f) },
+                    modifier = Modifier.scale(starScale)
+                ) {
+                    Icon(
+                        imageVector = if (isActive) Icons.Default.Star else Icons.Default.StarBorder,
+                        contentDescription = "Star ${index + 1}",
+                        tint = if (isActive) Color(0xFFFFD700) else Color(0xFFCCCCCC),
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
             }
+        }
+        
+        // Display the selected rating
+        if (rating > 0) {
+            Text(
+                text = when (rating) {
+                    1f -> "Rất tệ"
+                    2f -> "Tệ"
+                    3f -> "Bình thường"
+                    4f -> "Tốt"
+                    5f -> "Tuyệt vời"
+                    else -> ""
+                },
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun RatingBar(
+    starCount: Int,
+    ratingCount: Int,
+    totalRatings: Int,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Star count display
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.width(32.dp)
+        ) {
+            Text(
+                text = "$starCount",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
+            
+            Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        
+        Spacer(modifier = Modifier.width(8.dp))
+        
+        // Progress bar
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            // Calculate percentage
+            val percentage = if (totalRatings > 0) {
+                ratingCount / totalRatings.toFloat()
+            } else 0f
+            
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(percentage)
+                    .background(MaterialTheme.colorScheme.primary)
+            )
+        }
+    }
+}
+
+@Composable
+fun FilterChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(24.dp))
+            .clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 } 
