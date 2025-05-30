@@ -101,7 +101,15 @@ fun ReaderScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = { navController?.navigateUp() }) {
+                    IconButton(onClick = { 
+                        // Navigate directly to the chapters screen instead of popping back stack
+                        navController?.navigate("chapters/$mangaId") {
+                            // Clear the back stack up to the chapters screen
+                            popUpTo("chapters/$mangaId") {
+                                inclusive = false
+                            }
+                        }
+                    }) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Back"

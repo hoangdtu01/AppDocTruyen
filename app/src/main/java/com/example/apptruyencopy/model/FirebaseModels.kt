@@ -33,4 +33,15 @@ data class Comment(
     // Thêm thông tin người dùng để hiển thị trong UI
     var userName: String = "",
     var userAvatar: String = ""
+)
+
+data class Rating(
+    @DocumentId
+    val ratingId: String = "",
+    val mangaId: String = "",
+    val userId: String = "",
+    val userName: String = "",
+    val score: Float = 0f,
+    val review: String = "",
+    val createdAt: Timestamp = Timestamp.now()
 ) 

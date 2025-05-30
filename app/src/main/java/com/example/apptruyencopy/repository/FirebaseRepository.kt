@@ -3,6 +3,7 @@ package com.example.apptruyencopy.repository
 import com.example.apptruyencopy.model.Comment
 import com.example.apptruyencopy.model.FirebaseUser
 import com.example.apptruyencopy.model.ReadingHistory
+import com.example.apptruyencopy.model.Rating
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
@@ -251,6 +252,8 @@ class FirebaseRepository {
         val userId = auth.currentUser?.uid ?: return
         val user = getUser(userId)
         val email = user?.email ?: auth.currentUser?.email ?: ""
+
+        // Split email to get user name
         val userName = email.split("@").firstOrNull() ?: ""
         
         val comment = Comment(
@@ -295,6 +298,109 @@ class FirebaseRepository {
                 .document(commentId)
                 .delete()
                 .await()
+        }
+    }
+
+    // Rating operations
+    suspend fun addRating(mangaId: String, score: Float, review: String) {
+        val userId = auth.currentUser?.uid ?: return
+        val user = getUser(userId)
+        val email = user?.email ?: auth.currentUser?.email ?: ""
+
+        // Split email to get user name
+        val userName = email.split("@").firstOrNull() ?: ""
+        
+        val rating = Rating(
+            mangaId = mangaId,
+            userId = userId,
+            userName = userName,
+            score = score,
+            review = review
+        )
+        
+        // Check if user already rated this manga
+        val existingRating = db.collection("ratings")
+            .whereEqualTo("mangaId", mangaId)
+            .whereEqualTo("userId", userId)
+            .get()
+            .await()
+            
+        if (existingRating.isEmpty) {
+            // Add new rating
+            db.collection("ratings")
+                .add(rating)
+                .await()
+        } else {
+            // Update existing rating
+            val docId = existingRating.documents.first().id
+            db.collection("ratings")
+                .document(docId)
+                .set(rating.copy(ratingId = docId))
+                .await()
+        }
+    }
+
+    suspend fun getRatings(mangaId: String): List<Rating> {
+        return try {
+            db.collection("ratings")
+                .whereEqualTo("mangaId", mangaId)
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .get()
+                .await()
+                .toObjects(Rating::class.java)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun deleteRating(ratingId: String) {
+        val userId = auth.currentUser?.uid ?: return
+        
+        // Check if rating belongs to current user
+        val rating = db.collection("ratings")
+            .document(ratingId)
+            .get()
+            .await()
+            .toObject(Rating::class.java)
+            
+        if (rating?.userId == userId) {
+            db.collection("ratings")
+                .document(ratingId)
+                .delete()
+                .await()
+        }
+    }
+    
+    suspend fun getUserRating(mangaId: String): Rating? {
+        val userId = auth.currentUser?.uid ?: return null
+        
+        return try {
+            val querySnapshot = db.collection("ratings")
+                .whereEqualTo("mangaId", mangaId)
+                .whereEqualTo("userId", userId)
+                .get()
+                .await()
+                
+            if (querySnapshot.isEmpty) {
+                null
+            } else {
+                querySnapshot.documents.first().toObject(Rating::class.java)
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    suspend fun getAverageRating(mangaId: String): Float {
+        return try {
+            val ratings = getRatings(mangaId)
+            if (ratings.isEmpty()) {
+                0f
+            } else {
+                ratings.map { it.score }.average().toFloat()
+            }
+        } catch (e: Exception) {
+            0f
         }
     }
 } 

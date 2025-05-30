@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.apptruyencopy.model.Chapter
 import com.example.apptruyencopy.model.Comment
 import com.example.apptruyencopy.model.Manga
+import com.example.apptruyencopy.model.Rating
 import com.example.apptruyencopy.repository.FirebaseRepository
 import com.example.apptruyencopy.repository.MangaRepository
 import com.google.firebase.auth.FirebaseAuth
@@ -47,39 +48,54 @@ class ChaptersViewModel(
     private val _commentText = mutableStateOf("")
     val commentText: State<String> = _commentText
     
+    // Rating states
+    private val _ratings = mutableStateOf<List<Rating>>(emptyList())
+    val ratings: State<List<Rating>> = _ratings
+    
+    private val _isRatingsLoading = mutableStateOf(false)
+    val isRatingsLoading: State<Boolean> = _isRatingsLoading
+    
+    private val _userRating = mutableStateOf<Rating?>(null)
+    val userRating: State<Rating?> = _userRating
+    
+    private val _ratingScore = mutableStateOf(0f)
+    val ratingScore: State<Float> = _ratingScore
+    
+    private val _ratingReview = mutableStateOf("")
+    val ratingReview: State<String> = _ratingReview
+    
+    private val _averageRating = mutableStateOf(0f)
+    val averageRating: State<Float> = _averageRating
+    
     val languageOptions = mapOf("vi" to "Tiếng Việt", "en" to "Tiếng Anh")
     
     fun loadMangaDetail(mangaId: String) {
+        _isLoading.value = true
         viewModelScope.launch {
             try {
                 val mangaDetail = repository.getMangaDetail(mangaId)
                 _manga.value = mangaDetail
                 
-                // Lấy tổng số chapter tiếng Anh
-                val total = repository.getChapterCount(mangaId, "en")
-                _totalEnChapters.value = total
+                // Load English chapters for count
+                val enChapters = repository.getChapterList(mangaId, "en")
+                _totalEnChapters.value = enChapters.size
                 
-                // Check if manga is in favorites
-                checkFavoriteStatus(mangaId)
+                // Check if manga is in user's favorites
+                if (auth.currentUser != null) {
+                    val favorites = firebaseRepository.getFavoriteMangas(auth.currentUser!!.uid)
+                    _isFavorite.value = favorites.contains(mangaId)
+                }
                 
-                // Load comments for this manga
+                // Load comments
                 loadComments(mangaId)
+                
+                // Load ratings
+                loadRatings(mangaId)
+                
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-        }
-    }
-    
-    private fun checkFavoriteStatus(mangaId: String) {
-        val userId = auth.currentUser?.uid ?: return
-        
-        viewModelScope.launch {
-            try {
-                val favorites = firebaseRepository.getFavoriteMangas(userId)
-                _isFavorite.value = favorites.contains(mangaId)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            _isLoading.value = false
         }
     }
     
@@ -93,7 +109,6 @@ class ChaptersViewModel(
                 } else {
                     firebaseRepository.addToFavorites(mangaId)
                 }
-                // Update the favorite status
                 _isFavorite.value = !_isFavorite.value
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -161,6 +176,83 @@ class ChaptersViewModel(
                 firebaseRepository.deleteComment(commentId)
                 // Reload comments to reflect the deletion
                 loadComments(mangaId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    // Rating related functions
+    fun loadRatings(mangaId: String) {
+        _isRatingsLoading.value = true
+        viewModelScope.launch {
+            try {
+                // Get all ratings
+                val ratingsList = firebaseRepository.getRatings(mangaId)
+                _ratings.value = ratingsList
+                
+                // Get average rating
+                _averageRating.value = firebaseRepository.getAverageRating(mangaId)
+                
+                // Get user's rating if they're logged in
+                if (auth.currentUser != null) {
+                    val userRating = firebaseRepository.getUserRating(mangaId)
+                    _userRating.value = userRating
+                    
+                    // Set current rating values if user has rated
+                    userRating?.let {
+                        _ratingScore.value = it.score
+                        _ratingReview.value = it.review
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            _isRatingsLoading.value = false
+        }
+    }
+    
+    fun updateRatingScore(score: Float) {
+        _ratingScore.value = score
+    }
+    
+    fun updateRatingReview(review: String) {
+        _ratingReview.value = review
+    }
+    
+    fun submitRating(mangaId: String) {
+        if (auth.currentUser == null) return
+        
+        viewModelScope.launch {
+            try {
+                firebaseRepository.addRating(
+                    mangaId = mangaId,
+                    score = _ratingScore.value,
+                    review = _ratingReview.value
+                )
+                
+                // Reload ratings to show the new one
+                loadRatings(mangaId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    fun deleteRating(ratingId: String, mangaId: String) {
+        if (auth.currentUser == null) return
+        
+        viewModelScope.launch {
+            try {
+                firebaseRepository.deleteRating(ratingId)
+                
+                // Reset user rating values
+                _ratingScore.value = 0f
+                _ratingReview.value = ""
+                _userRating.value = null
+                
+                // Reload ratings to reflect the deletion
+                loadRatings(mangaId)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
